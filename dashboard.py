@@ -13,6 +13,12 @@ Features:
 - CSV export endpoints
 - Optional SQLite cache/rebuild
 
+IMPORTANT - Log Format Requirements:
+- page_log MUST use standard CUPS format with date: [DD/Mon/YYYY:HH:MM:SS -TZ]
+- Example valid date: [06/Mar/2026:09:15:01 -0500]
+- Lines with non-standard formats will be skipped (no error, just ignored)
+- If dashboard shows no data, verify log format: head -n 5 /var/log/cups/page_log
+
 Default assumptions:
 - page_log path: /var/log/cups/page_log
 - date format from CUPS page_log like: [06/Mar/2026:09:15:01 -0500]
@@ -51,7 +57,7 @@ APP_TITLE = "CUPS Internal Dashboard"
 DEFAULT_PAGE_LOG_PATH = "/var/log/cups/page_log"
 DEFAULT_DB_PATH = "./cups_dashboard.db"
 DEFAULT_HOST = "0.0.0.0"
-DEFAULT_PORT = 5000
+DEFAULT_PORT = 962
 DEFAULT_DEBUG = False
 
 PAGE_LOG_PATH = os.environ.get("CUPS_PAGE_LOG", DEFAULT_PAGE_LOG_PATH)

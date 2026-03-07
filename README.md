@@ -55,9 +55,19 @@ python3 dashboard.py
 
 ## Accepted `page_log` Format
 
+⚠️ **CRITICAL**: The dashboard requires CUPS `page_log` to use the standard format. If your log format differs, the parser will skip those lines and no data will appear in the dashboard.
+
+### Expected Format
+
 The parser expects lines beginning with:
 
 `printer user job-id [DD/Mon/YYYY:HH:MM:SS -TZ]`
+
+**Date format is critical**: `[06/Mar/2026:09:15:01 -0500]`
+- Square brackets required
+- Two-digit day, three-letter month (Jan/Feb/Mar/etc), four-digit year
+- Time in HH:MM:SS format
+- Timezone offset (e.g., `-0500`, `+0000`) or timezone name
 
 It accepts two page-count variants:
 
@@ -70,12 +80,28 @@ Optional explicit impressions token is also accepted in trailing fields:
 - `impressions=123`
 - `impression=123`
 
-Example valid lines:
+### Example Valid Lines
 
 ```text
 HP-Laser jeff 184 [06/Mar/2026:09:15:01 -0500] total 12 acct01 host01 Q1_Report A4 two-sided-long-edge
 HP-Laser jeff 185 [06/Mar/2026:09:20:12 -0500] 3 acct01 host01 Notes A4 one-sided
 ```
+
+### Verifying Your Log Format
+
+To check if your `page_log` is compatible, run:
+
+```bash
+head -n 5 /var/log/cups/page_log
+```
+
+Look for the date format in square brackets. If you see a different format (e.g., Unix timestamps, ISO dates), the parser will not work without modification.
+
+### Troubleshooting
+
+- **No data showing in dashboard**: Check that your `page_log` matches the expected format above
+- **Some jobs missing**: Lines with malformed dates or non-standard formats are silently skipped
+- **Database not populating**: Verify file permissions and that the log file path is correct
 
 ## Deployment Notes
 
