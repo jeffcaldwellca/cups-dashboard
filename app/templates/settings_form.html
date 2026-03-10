@@ -1,0 +1,313 @@
+<div class="card">
+  <div class="card-header"><h5 class="mb-0">Application Settings</h5></div>
+  <div class="card-body p-0">
+    <ul class="nav nav-tabs px-3 pt-2" id="settingsTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-ad" type="button">
+          Active Directory
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-ssl" type="button">
+          HTTPS / SSL
+        </button>
+      </li>
+    </ul>
+    <div class="tab-content p-4">
+
+      <!-- AD tab -->
+      <div class="tab-pane fade show active" id="tab-ad">
+        {% if save_ok is not none %}
+          <div class="alert alert-{{ 'success' if save_ok else 'danger' }} py-2">
+            {{ save_msg }}
+          </div>
+        {% endif %}
+
+        <form method="post" action="/settings">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+          <div class="settings-section">
+            <h6>Connection</h6>
+            <div class="form-row">
+              <div class="field">
+                <label for="ad_server">Server / Host</label>
+                <input id="ad_server" name="ad_server" class="form-control"
+                       value="{{ cfg.server }}" placeholder="dc.example.com">
+              </div>
+              <div class="field">
+                <label for="ad_port">Port</label>
+                <input id="ad_port" name="ad_port" type="number" class="form-control"
+                       value="{{ cfg.port }}" style="max-width:120px">
+              </div>
+            </div>
+            <div class="check-row">
+              <input id="use_ssl" name="use_ssl" type="checkbox" {{ 'checked' if cfg.use_ssl }}>
+              <label for="use_ssl">Use LDAPS (SSL/TLS)</label>
+            </div>
+            <div class="check-row">
+              <input id="verify_ssl" name="verify_ssl" type="checkbox" {{ 'checked' if cfg.verify_ssl }}>
+              <label for="verify_ssl">Verify SSL certificate</label>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h6>Bind Credentials</h6>
+            <div class="form-row">
+              <div class="field">
+                <label for="bind_dn">Bind DN</label>
+                <input id="bind_dn" name="bind_dn" class="form-control"
+                       value="{{ cfg.bind_dn }}"
+                       placeholder="CN=svc-cups,OU=ServiceAccounts,DC=example,DC=com">
+              </div>
+              <div class="field">
+                <label for="bind_password">Bind Password</label>
+                {% if ad_bind_pw_env %}
+                  <input class="form-control" disabled value="(set via CUPS_AD_BIND_PASSWORD env var)">
+                  <input type="hidden" name="bind_password" value="">
+                {% else %}
+                  <input id="bind_password" name="bind_password" type="password"
+                         class="form-control" autocomplete="new-password"
+                         placeholder="Leave blank to keep existing">
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h6>Directory Structure</h6>
+            <div class="form-row">
+              <div class="field">
+                <label for="base_dn">Base DN</label>
+                <input id="base_dn" name="base_dn" class="form-control"
+                       value="{{ cfg.base_dn }}" placeholder="DC=example,DC=com">
+              </div>
+              <div class="field">
+                <label for="user_search_base">User Search Base (optional)</label>
+                <input id="user_search_base" name="user_search_base" class="form-control"
+                       value="{{ cfg.user_search_base }}"
+                       placeholder="OU=Users,DC=example,DC=com">
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h6>Attribute Mapping</h6>
+            <div class="form-row">
+              <div class="field">
+                <label for="username_attr">Username attribute</label>
+                <input id="username_attr" name="username_attr" class="form-control"
+                       value="{{ cfg.username_attr }}" placeholder="sAMAccountName">
+              </div>
+              <div class="field">
+                <label for="display_name_attr">Display name attribute</label>
+                <input id="display_name_attr" name="display_name_attr" class="form-control"
+                       value="{{ cfg.display_name_attr }}" placeholder="displayName">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="field">
+                <label for="email_attr">Email attribute</label>
+                <input id="email_attr" name="email_attr" class="form-control"
+                       value="{{ cfg.email_attr }}" placeholder="mail">
+              </div>
+              <div class="field">
+                <label for="department_attr">Department attribute</label>
+                <input id="department_attr" name="department_attr" class="form-control"
+                       value="{{ cfg.department_attr }}" placeholder="department">
+              </div>
+            </div>
+            <div class="form-row one">
+              <div class="field">
+                <label for="title_attr">Title attribute</label>
+                <input id="title_attr" name="title_attr" class="form-control"
+                       value="{{ cfg.title_attr }}" placeholder="title">
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h6>Cache</h6>
+            <div class="form-row one">
+              <div class="field">
+                <label for="cache_ttl_hours">Cache TTL (hours)</label>
+                <input id="cache_ttl_hours" name="cache_ttl_hours" type="number"
+                       class="form-control" value="{{ cfg.cache_ttl_hours }}"
+                       style="max-width:120px" min="1" max="720">
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h6>Enable</h6>
+            <div class="check-row">
+              <input id="ad_enabled" name="ad_enabled" type="checkbox"
+                     {{ 'checked' if cfg.enabled }}>
+              <label for="ad_enabled">Enable Active Directory enrichment</label>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:.75rem;margin-top:1.5rem;align-items:center">
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+            <button type="button" class="btn btn-secondary" id="btn-test-ad">Test Connection</button>
+            <button type="button" class="btn btn-secondary" id="btn-sync-ad">Sync AD Users</button>
+            <span id="ad-result" style="font-size:.875rem"></span>
+          </div>
+        </form>
+      </div><!-- /tab-ad -->
+
+      <!-- SSL tab -->
+      <div class="tab-pane fade" id="tab-ssl">
+
+        <div id="ssl-status-card" class="settings-section">
+          <div class="muted" style="font-size:.875rem">Loading certificate status&hellip;</div>
+        </div>
+
+        <div class="settings-section">
+          <h6>Upload Certificate &amp; Key</h6>
+          <p class="muted" style="font-size:.85rem;margin-bottom:.9rem">
+            Upload a PEM-encoded certificate and matching private key to enable HTTPS for this dashboard.
+            A <strong>server restart</strong> is required after uploading for changes to take effect.
+          </p>
+          <form id="ssl-upload-form" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="form-row">
+              <div class="field">
+                <label for="ssl_cert">Certificate file (.pem&nbsp;/&nbsp;.crt)</label>
+                <input id="ssl_cert" name="ssl_cert" type="file" class="form-control"
+                       accept=".pem,.crt,.cer">
+              </div>
+              <div class="field">
+                <label for="ssl_key">Private key file (.pem&nbsp;/&nbsp;.key)</label>
+                <input id="ssl_key" name="ssl_key" type="file" class="form-control"
+                       accept=".pem,.key">
+              </div>
+            </div>
+            <div style="display:flex;gap:.75rem;margin-top:1rem;align-items:center;flex-wrap:wrap">
+              <button type="button" id="btn-upload-ssl" class="btn btn-primary">Upload Certificate</button>
+              <button type="button" id="btn-remove-ssl" class="btn btn-secondary"
+                      style="color:#dc3545;border-color:#dc3545">Remove Certificate</button>
+              <span id="ssl-result" style="font-size:.875rem"></span>
+            </div>
+          </form>
+        </div>
+
+        <div class="settings-section">
+          <h6>Notes</h6>
+          <ul class="muted" style="font-size:.85rem;line-height:1.8;padding-left:1.2rem">
+            <li>Both files must be <strong>PEM-encoded</strong>. The certificate and key are validated as a matching pair before saving.</li>
+            <li>Intermediate / chain certificates should be appended to the certificate file (bundle).</li>
+            <li>For production deployments a reverse proxy (nginx, Caddy, Traefik) is recommended instead of Flask's built-in SSL.</li>
+            <li>CUPS manages its own certificate separately at <code>/etc/cups/ssl/</code> — this setting only affects the PaperTrail dashboard.</li>
+            <li>After uploading, restart the dashboard process. The URL will change from <code>http://</code> to <code>https://</code>.</li>
+          </ul>
+        </div>
+
+      </div><!-- /tab-ssl -->
+
+    </div><!-- /tab-content -->
+  </div><!-- /card-body -->
+</div>
+
+<script>
+(function(){
+  var csrf = document.querySelector('[name=csrf_token]').value;
+
+  function postJSON(url, cb) {
+    fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({csrf_token: csrf})
+    })
+    .then(function(r){ return r.json(); })
+    .then(cb)
+    .catch(function(e){ cb({success: false, message: String(e)}); });
+  }
+
+  // ── AD buttons ──────────────────────────────────────────────────────────
+  document.getElementById('btn-test-ad').addEventListener('click', function(){
+    var el = document.getElementById('ad-result');
+    el.textContent = 'Testing\u2026';
+    postJSON('/settings/test-ad', function(d){
+      el.style.color = d.success ? '#198754' : '#dc3545';
+      el.textContent = d.message;
+    });
+  });
+
+  document.getElementById('btn-sync-ad').addEventListener('click', function(){
+    var el = document.getElementById('ad-result');
+    el.textContent = 'Syncing\u2026';
+    postJSON('/settings/sync-ad', function(d){
+      el.style.color = d.success ? '#198754' : '#dc3545';
+      el.textContent = d.message;
+    });
+  });
+
+  // ── SSL status ───────────────────────────────────────────────────────────
+  function loadSslStatus() {
+    fetch('/settings/ssl-status')
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var el = document.getElementById('ssl-status-card');
+        if (!el) return;
+        if (!d.present) {
+          el.innerHTML = '<div class="alert alert-warning" style="margin:0">No certificate installed. Dashboard is running over <strong>HTTP</strong>.</div>';
+        } else {
+          var expHtml = d.expiry
+            ? ' &nbsp;<span class="muted" style="font-size:.875rem">Expires: <strong>' + d.expiry + '</strong></span>'
+            : '';
+          el.innerHTML = '<div class="alert alert-success" style="margin:0">'
+            + '<i class="bi bi-shield-lock-fill"></i> <strong>Certificate installed.</strong>' + expHtml + '</div>';
+        }
+      })
+      .catch(function(){
+        var el = document.getElementById('ssl-status-card');
+        if (el) el.innerHTML = '<div class="muted">Status unavailable.</div>';
+      });
+  }
+
+  loadSslStatus();
+
+  // ── SSL upload ───────────────────────────────────────────────────────────
+  document.getElementById('btn-upload-ssl').addEventListener('click', function(){
+    var certF = document.getElementById('ssl_cert').files[0];
+    var keyF  = document.getElementById('ssl_key').files[0];
+    var el    = document.getElementById('ssl-result');
+    if (!certF || !keyF) {
+      el.style.color = '#dc3545';
+      el.textContent = 'Select both a certificate file and a key file.';
+      return;
+    }
+    el.style.color = '#495057';
+    el.textContent = 'Uploading\u2026';
+    var fd = new FormData(document.getElementById('ssl-upload-form'));
+    fetch('/settings/upload-ssl', { method: 'POST', body: fd })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        el.style.color = d.success ? '#198754' : '#dc3545';
+        el.textContent = d.message;
+        if (d.success) loadSslStatus();
+      })
+      .catch(function(e){ el.style.color = '#dc3545'; el.textContent = String(e); });
+  });
+
+  // ── SSL remove ───────────────────────────────────────────────────────────
+  document.getElementById('btn-remove-ssl').addEventListener('click', function(){
+    var el = document.getElementById('ssl-result');
+    el.style.color = '#495057';
+    el.textContent = 'Removing\u2026';
+    postJSON('/settings/remove-ssl', function(d){
+      el.style.color = d.success ? '#198754' : '#dc3545';
+      el.textContent = d.message;
+      if (d.success) loadSslStatus();
+    });
+  });
+
+  // ── Activate tab from URL param ?tab=ssl ─────────────────────────────────
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('tab') === 'ssl') {
+    var sslTabBtn = document.querySelector('[data-bs-target="#tab-ssl"]');
+    if (sslTabBtn) bootstrap.Tab.getOrCreateInstance(sslTabBtn).show();
+  }
+
+})();
+</script>

@@ -1,0 +1,36 @@
+services:
+  cups-dashboard:
+    build: .
+    container_name: cups-dashboard
+    ports:
+      - "${CUPS_DASH_PORT:-5000}:5000"
+    volumes:
+      # Mount host CUPS log directory read-only so the container can read page_log.
+      # The PageLogFormat must be configured on the HOST first — run:
+      #   ./prep_cups_log_format.sh --restart
+      - /var/log/cups:/var/log/cups:ro
+      # Persistent SQLite database for the dashboard cache
+      - cups_dashboard_data:/data
+    environment:
+      CUPS_PAGE_LOG: /var/log/cups/page_log
+      CUPS_DASH_HOST: "0.0.0.0"
+      CUPS_DASH_PORT: "5000"
+      CUPS_DASH_DB: /data/cups_dashboard.db
+      CUPS_DASH_DEBUG: "${CUPS_DASH_DEBUG:-0}"
+      CUPS_LOG_REFRESH: "${CUPS_LOG_REFRESH:-300}"
+      CUPS_AD_BIND_PASSWORD: "${CUPS_AD_BIND_PASSWORD:-}"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:5000/')"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  cups_dashboard_data:
+    driver: local

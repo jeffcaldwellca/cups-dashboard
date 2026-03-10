@@ -1,0 +1,34 @@
+# Python artefacts
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local database files
+*.db
+*.db-shm
+*.db-wal
+
+# Backup files
+*.bak
+*.bak.*
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Editor / OS
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Not needed in the image
+README.md
+setup.sh
+prep_cups_log_format.sh
+deploy.sh
+docker-compose.yml

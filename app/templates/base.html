@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PaperTrail for CUPS{% if title != 'PaperTrail' %} — {{ title }}{% endif %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #007bff;
+      --primary-hover: #0056b3;
+      --light-color: #f8f9fa;
+      --border-color: #dee2e6;
+      --text-muted: #6c757d;
+      --success-color: #28a745;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #212529;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      background: linear-gradient(180deg, #f5f8fc 0%, #eef3fa 100%);
+    }
+    a { color: var(--primary-color); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .shell { max-width: 1240px; margin: 0 auto; padding: 1.25rem 1rem 2rem 1rem; }
+    .topbar {
+      display: flex; gap: 1rem; flex-wrap: wrap;
+      align-items: flex-start; justify-content: space-between;
+    }
+    .brand-tag {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      border-radius: 999px; border: 1px solid rgba(0,123,255,.2);
+      background: rgba(0,123,255,.1); color: var(--primary-color);
+      font-size: .74rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .04em; padding: .24rem .56rem; margin-bottom: .45rem;
+    }
+    .brand-title { font-size: 1.45rem; font-weight: 700; color: #1f2a37; line-height: 1.2; margin-bottom: .1rem; }
+    .brand-subtitle { font-size: .62em; font-weight: 500; color: #8a95a1; letter-spacing: normal; text-transform: none; vertical-align: middle; margin-left: .15em; }
+    .nav { display: flex; gap: .45rem; flex-wrap: wrap; }
+    .nav a {
+      border: 1px solid var(--border-color); color: #495057; background: #fff;
+      border-radius: .45rem; padding: .44rem .72rem; font-size: .875rem;
+      font-weight: 600; transition: all .2s ease;
+    }
+    .nav a:hover { color: var(--primary-color); border-color: rgba(0,123,255,.42); text-decoration: none; transform: translateY(-1px); }
+    .nav a.active {
+      color: #fff; border-color: var(--primary-color);
+      background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+      box-shadow: 0 .4rem .9rem rgba(0,123,255,.22);
+    }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 1rem; margin-bottom: 1rem; }
+    .card {
+      background: #fff; border: 1px solid var(--border-color); border-radius: .7rem;
+      padding: 1rem 1.1rem; box-shadow: 0 .3rem 1rem rgba(0,0,0,.08);
+      transition: all .24s ease; animation: fade-slide-in 300ms ease both;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 .5rem 1.2rem rgba(0,0,0,.12); }
+    .card h3, .card h2 { margin-top: 0; margin-bottom: .5rem; color: #212529; }
+    h2 { font-size: 1.06rem; font-weight: 700; }
+    .metric { font-size: 1.95rem; font-weight: 700; margin: .38rem 0; color: #1f2a37; }
+    .muted { color: var(--text-muted); font-size: .92rem; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+    .two-col > .card { min-width: 0; }
+    @media (max-width:900px) { .two-col { grid-template-columns: 1fr; } }
+    table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: .5rem; font-size: .9rem; }
+    .table-wrap {
+      overflow-x: auto; border: 1px solid var(--border-color);
+      border-radius: .5rem; background: white; max-width: 100%;
+    }
+    .table-wrap table { margin-top: 0; min-width: 620px; }
+    th, td { text-align: left; padding: .62rem .7rem; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+    th { background: #f8f9fa; color: #495057; font-weight: 600; }
+    tr:hover td { background: rgba(0,123,255,.03); }
+    .metric-card { position: relative; overflow: hidden; }
+    .metric-card::before {
+      content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+      background: linear-gradient(90deg, var(--primary-color), #17a2b8); opacity: .95;
+    }
+    .filters {
+      display: flex; gap: .75rem; flex-wrap: wrap; align-items: end;
+      margin-bottom: 1rem; padding: .95rem; border-radius: .7rem;
+      border: 1px solid var(--border-color); background: #fff;
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; min-width: 180px; }
+    label { font-size: .82rem; font-weight: 600; color: #495057; }
+    input, select {
+      padding: .5rem .66rem; border-radius: .45rem;
+      border: 1px solid #ced4da; background: white; color: #212529;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 .2rem rgba(0,123,255,.25); }
+    button {
+      padding: .52rem .88rem; border-radius: .45rem; border: 1px solid var(--primary-color);
+      background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+      color: white; font-weight: 600; cursor: pointer;
+    }
+    button:hover { filter: brightness(1.03); transform: translateY(-1px); }
+    .pill {
+      display: inline-block; padding: .2rem .5rem; border-radius: 999px;
+      background: rgba(0,123,255,.1); color: var(--primary-color);
+      border: 1px solid rgba(0,123,255,.24); font-size: .74rem; font-weight: 600;
+    }
+    .pill-success { background: rgba(40,167,69,.1); color: #28a745; border-color: rgba(40,167,69,.3); }
+    .footer { margin-top: 1.2rem; color: var(--text-muted); font-size: .82rem; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .action-link { display: inline-flex; align-items: center; gap: 6px; margin-bottom: .55rem; font-size: .84rem; font-weight: 600; color: var(--primary-color); }
+    .alert { border-radius: .5rem; padding: .65rem .9rem; font-size: .88rem; margin-bottom: .75rem; }
+    .alert-warning { background: #fff3cd; border: 1px solid #ffc107; color: #856404; }
+    .alert-success { background: #d1e7dd; border: 1px solid #a3cfbb; color: #0f5132; }
+    .alert-danger  { background: #f8d7da; border: 1px solid #f1aeb5; color: #842029; }
+    .alert-info    { background: #cff4fc; border: 1px solid #9eeaf9; color: #055160; }
+    .settings-section { margin-bottom: 1.4rem; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-bottom: .75rem; }
+    .form-row.one   { grid-template-columns: 1fr; }
+    .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width:720px) { .form-row, .form-row.three { grid-template-columns: 1fr; } }
+    .form-row .field { min-width: 0; }
+    .check-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .45rem; }
+    .check-row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--primary-color); cursor: pointer; }
+    .check-row label { margin: 0; cursor: pointer; font-size: .9rem; font-weight: 400; }
+    .btn-secondary { background: #fff; color: #495057; border: 1px solid #ced4da; font-weight: 600; padding: .52rem .88rem; border-radius: .45rem; cursor: pointer; }
+    .btn-secondary:hover { background: #f8f9fa; transform: translateY(-1px); }
+    .btn-danger { background: linear-gradient(135deg,#dc3545,#b02a37); border-color: #dc3545; color: #fff; }
+    .ad-profile {
+      background: #f8f9fa; border: 1px solid var(--border-color); border-radius: .55rem;
+      padding: .7rem .9rem; margin-bottom: .9rem;
+      display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: .5rem;
+    }
+    .ad-profile-item .label { font-size: .72rem; font-weight: 700; color: #6c757d; text-transform: uppercase; letter-spacing: .03em; }
+    .ad-profile-item .value { color: #212529; font-size: .9rem; }
+    .setup-panel { margin-top: .95rem; border: 1px solid var(--border-color); border-radius: .65rem; background: #fff; overflow: hidden; }
+    .setup-panel summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      justify-content: space-between; gap: 12px; padding: .72rem .86rem;
+      font-weight: 600; color: #212529; background: #f8f9fa; transition: background-color 160ms ease;
+    }
+    .setup-panel summary::-webkit-details-marker { display: none; }
+    .setup-panel summary:hover { background: #eef5ff; }
+    .setup-panel summary .chev { font-size: 12px; color: #6c757d; transition: transform 150ms ease; }
+    .setup-panel[open] summary .chev { transform: rotate(180deg); }
+    .setup-body { padding: .85rem; border-top: 1px solid var(--border-color); color: #495057; font-size: .82rem; }
+    .setup-body h4 { margin: 0 0 8px 0; font-size: .82rem; color: #212529; }
+    .setup-grid { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: .62rem; margin-top: .52rem; }
+    .setup-grid > div { padding: .62rem; border: 1px solid var(--border-color); border-radius: .52rem; background: #fff; }
+    .setup-grid .head { font-size: 11px; letter-spacing: .03em; text-transform: uppercase; color: #6c757d; margin-bottom: .2rem; font-weight: 700; }
+    .setup-note { margin-top: .62rem; color: #495057; }
+    .mono-chip {
+      display: inline-flex; margin-top: 2px; padding: 2px 6px; border-radius: 6px;
+      background: #f8f9fa; border: 1px solid var(--border-color);
+      font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+      font-size: 12px; color: #343a40; word-break: break-all;
+    }
+    .card:nth-of-type(1) { animation-delay: 30ms; }
+    .card:nth-of-type(2) { animation-delay: 70ms; }
+    .card:nth-of-type(3) { animation-delay: 110ms; }
+    @keyframes fade-slide-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @media (max-width:960px) { .setup-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="card mb-4">
+      <div class="topbar">
+        <div>
+          <div class="brand-tag"><i class="bi bi-graph-up-arrow"></i> Internal Reporting</div>
+          <div class="brand-title">PaperTrail <span class="brand-subtitle">for CUPS</span></div>
+          <div class="muted">Print usage, trend visibility, and monthly reporting</div>
+        </div>
+        <div class="nav">
+          <a href="{{ url_for('main.dashboard') }}"   class="{{ 'active' if current_path == url_for('main.dashboard') else '' }}">Dashboard</a>
+          <a href="{{ url_for('users.users_page') }}" class="{{ 'active' if current_path == url_for('users.users_page') else '' }}">Users</a>
+          <a href="{{ url_for('printers.printers_page') }}" class="{{ 'active' if current_path == url_for('printers.printers_page') else '' }}">Printers</a>
+          <a href="{{ url_for('jobs.jobs_page') }}"   class="{{ 'active' if current_path == url_for('jobs.jobs_page') else '' }}">Recent Jobs</a>
+          <a href="{{ url_for('main.monthly_page') }}" class="{{ 'active' if current_path == url_for('main.monthly_page') else '' }}">Monthly</a>
+          <a href="{{ url_for('settings.settings_page') }}" class="{{ 'active' if current_path == url_for('settings.settings_page') else '' }}">
+            &#9881; Settings{% if ad_enabled %}&nbsp;<span class="pill pill-success" style="font-size:.65rem;padding:.1rem .38rem;">AD</span>{% endif %}
+          </a>
+          <a href="{{ url_for('admin.rebuild_db') }}" class="{{ 'active' if current_path == url_for('admin.rebuild_db') else '' }}">Rebuild DB</a>
+        </div>
+      </div>
+      <details class="setup-panel">
+        <summary>
+          <span>Setup, Environment, and Accepted <code>page_log</code> Format</span>
+          <span class="chev">&#9660;</span>
+        </summary>
+        <div class="setup-body">
+          <h4>Expected CUPS <code>page_log</code> line structure</h4>
+          <div>Required base tokens:</div>
+          <div class="mono-chip">printer user job-id [DD/Mon/YYYY:HH:MM:SS -TZ]</div>
+          <div class="setup-note">Accepted page-count variants:</div>
+          <div class="mono-chip">... total PAGES [billing] [host] [job-name] [media] [sides]</div>
+          <div class="mono-chip">... PAGES [billing] [host] [job-name] [media] [sides]</div>
+          <div class="setup-note">Environment variables:</div>
+          <div class="setup-grid">
+            <div>
+              <div class="head">Variable</div>
+              <div class="mono">CUPS_PAGE_LOG</div>
+              <div class="mono">CUPS_DASH_DB</div>
+              <div class="mono">CUPS_DASH_HOST</div>
+              <div class="mono">CUPS_DASH_PORT</div>
+              <div class="mono">CUPS_DASH_DEBUG</div>
+              <div class="mono">CUPS_LOG_REFRESH</div>
+              <div class="mono">CUPS_AD_BIND_PASSWORD</div>
+            </div>
+            <div>
+              <div class="head">Current</div>
+              <div class="mono-chip">{{ current_page_log_path }}</div>
+              <div class="mono-chip">{{ current_db_path }}</div>
+              <div class="mono-chip">{{ current_host }}</div>
+              <div class="mono-chip">{{ current_port }}</div>
+              <div class="mono-chip">{{ '1' if current_debug else '0' }}</div>
+              <div class="mono-chip">{{ log_refresh_secs }}s</div>
+              <div class="mono-chip">{{ 'set' if ad_bind_pw_env else 'not set' }}</div>
+            </div>
+            <div>
+              <div class="head">Default</div>
+              <div class="mono-chip">{{ default_page_log_path }}</div>
+              <div class="mono-chip">{{ default_db_path }}</div>
+              <div class="mono-chip">{{ default_host }}</div>
+              <div class="mono-chip">{{ default_port }}</div>
+              <div class="mono-chip">{{ '1' if default_debug else '0' }}</div>
+              <div class="mono-chip">300s</div>
+              <div class="mono-chip">—</div>
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    {{ body|safe }}
+
+    <div class="footer">
+      Source log: <span class="mono">{{ log_path }}</span> &nbsp;|&nbsp;
+      SQLite cache: <span class="mono">{{ db_path }}</span> &nbsp;|&nbsp;
+      Last refreshed: <span class="mono">{{ last_import }}</span>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
