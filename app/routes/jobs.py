@@ -1,7 +1,7 @@
 from flask import Blueprint, request, url_for
 
 from ..renderer import render_page
-from ..utils import csv_response, current_month_fallback, h, month_filter_form, rows, scalar
+from ..utils import color_mode_badge, csv_response, current_month_fallback, h, month_filter_form, rows, scalar
 
 bp = Blueprint("jobs", __name__)
 
@@ -22,7 +22,7 @@ def jobs_page():
     if month:
         recent = rows(
             """
-            SELECT job_ts, user_name, printer, job_name, pages, impressions, sheets, media, sides, host
+            SELECT job_ts, user_name, printer, job_name, pages, impressions, sheets, media, sides, host, color_mode
             FROM jobs
             WHERE year_month = ?
             ORDER BY job_ts DESC
@@ -33,7 +33,7 @@ def jobs_page():
     else:
         recent = rows(
             """
-            SELECT job_ts, user_name, printer, job_name, pages, impressions, sheets, media, sides, host
+            SELECT job_ts, user_name, printer, job_name, pages, impressions, sheets, media, sides, host, color_mode
             FROM jobs
             ORDER BY job_ts DESC
             LIMIT ? OFFSET ?
@@ -63,8 +63,8 @@ def jobs_page():
       {pagination}
       <div class="table-wrap">
         <table>
-          <tr><th>Time</th><th>User</th><th>Printer</th><th>Job Name</th><th>Impressions</th><th>Sheets</th><th>Pages</th><th>Media</th><th>Sides</th><th>Host</th></tr>
-          {''.join(f'<tr><td>{h(r["job_ts"])}</td><td>{h(r["user_name"])}</td><td>{h(r["printer"])}</td><td>{h(r["job_name"] or "-")}</td><td>{r["impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td><td>{h(r["media"] or "-")}</td><td>{h(r["sides"] or "-")}</td><td>{h(r["host"] or "-")}</td></tr>' for r in recent)}
+          <tr><th>Time</th><th>User</th><th>Printer</th><th>Job Name</th><th>Color</th><th>Impressions</th><th>Sheets</th><th>Pages</th><th>Media</th><th>Sides</th><th>Host</th></tr>
+          {''.join(f'<tr><td>{h(r["job_ts"])}</td><td>{h(r["user_name"])}</td><td>{h(r["printer"])}</td><td>{h(r["job_name"] or "-")}</td><td>{color_mode_badge(r["color_mode"])}</td><td>{r["impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td><td>{h(r["media"] or "-")}</td><td>{h(r["sides"] or "-")}</td><td>{h(r["host"] or "-")}</td></tr>' for r in recent)}
         </table>
       </div>
       {pagination}
@@ -81,7 +81,9 @@ def export_monthly_csv():
                COALESCE(SUM(impressions),0) AS impressions,
                COALESCE(SUM(sheets),0) AS sheets,
                COUNT(DISTINCT user_name) AS users,
-               COUNT(DISTINCT printer) AS printers
+               COUNT(DISTINCT printer) AS printers,
+               COALESCE(SUM(CASE WHEN color_mode = 'color' THEN impressions ELSE 0 END),0) AS color_impressions,
+               COALESCE(SUM(CASE WHEN color_mode IN ('monochrome','process-monochrome','auto-monochrome','bi-level','process-bi-level') THEN impressions ELSE 0 END),0) AS bw_impressions
         FROM jobs
         GROUP BY year_month
         ORDER BY year_month DESC
@@ -89,9 +91,9 @@ def export_monthly_csv():
     )
     return csv_response(
         "cups_monthly.csv",
-        ["month", "jobs", "impressions", "sheets", "pages", "users", "printers"],
+        ["month", "jobs", "impressions", "color_impressions", "bw_impressions", "sheets", "pages", "users", "printers"],
         (
-            (r["year_month"], r["jobs"], r["impressions"], r["sheets"], r["pages"], r["users"], r["printers"])
+            (r["year_month"], r["jobs"], r["impressions"], r["color_impressions"], r["bw_impressions"], r["sheets"], r["pages"], r["users"], r["printers"])
             for r in result
         ),
     )

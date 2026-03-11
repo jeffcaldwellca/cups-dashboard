@@ -49,7 +49,7 @@ def get_db() -> sqlite3.Connection:
 
 def init_db() -> None:
     # Import here to avoid circular dependency (importer → db → importer).
-    from .importer import ensure_jobs_columns, backfill_impressions_and_sheets, repair_historical_rows
+    from .importer import ensure_jobs_columns, backfill_impressions_and_sheets, repair_historical_rows, backfill_color_mode
     with closing(get_db()) as conn:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
@@ -70,6 +70,7 @@ def init_db() -> None:
                 job_name    TEXT,
                 media       TEXT,
                 sides       TEXT,
+                color_mode  TEXT    NOT NULL DEFAULT '',
                 raw_line    TEXT    NOT NULL,
                 UNIQUE(raw_line)
             );
@@ -103,6 +104,7 @@ def init_db() -> None:
         ensure_jobs_columns(conn)
         backfill_impressions_and_sheets(conn)
         repair_historical_rows(conn)
+        backfill_color_mode(conn)
         conn.commit()
 
 # ─── Config key/value helpers ──────────────────────────────────────────────────

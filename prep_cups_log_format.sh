@@ -26,8 +26,8 @@ done
 
 # The exact PageLogFormat required by cups-dashboard.
 # Produces lines like:
-#   HP-LaserJet john 42 [06/Mar/2026:09:15:01 -0500] 1 2 - myhost doc.pdf Letter two-sided-long-edge
-PAGE_LOG_FORMAT='PageLogFormat %p %u %j [%d/%b/%Y:%T %z] %P %C %{billing} %{hostname} %{job-name} %{media} %{sides}'
+#   HP-LaserJet john 42 [06/Mar/2026:09:15:01 -0500] 1 2 - myhost doc.pdf Letter two-sided-long-edge color
+PAGE_LOG_FORMAT='PageLogFormat %p %u %j [%d/%b/%Y:%T %z] %P %C %{billing} %{hostname} %{job-name} %{media} %{sides} %{print-color-mode}'
 
 # ─── Banner ──────────────────────────────────────────────────────────────────
 echo "======================================="

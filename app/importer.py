@@ -64,6 +64,19 @@ def estimate_sheets(impressions: int, sides: str) -> int:
     return impressions
 
 
+_COLOR_MODE_VALUES = frozenset({
+    "color", "monochrome", "auto", "auto-monochrome",
+    "bi-level", "process-bi-level", "process-monochrome", "highlight",
+})
+
+
+def parse_color_mode(extras: list[str]) -> str:
+    for token in extras:
+        if token.lower() in _COLOR_MODE_VALUES:
+            return token.lower()
+    return ""
+
+
 def parse_cups_date(value: str) -> Optional[datetime]:
     match = DATE_RE.match(value.strip())
     if not match:
@@ -122,12 +135,13 @@ def parse_page_log_line(line: str) -> Optional[JobRecord]:
     explicit_impressions = parse_explicit_impressions(extras)
     impressions = explicit_impressions if explicit_impressions is not None else pages
     sheets      = estimate_sheets(impressions, sides)
+    color_mode  = parse_color_mode(extras)
 
     return JobRecord(
         printer=printer, user=user, job_id=job_id, timestamp=ts,
         pages=pages, impressions=impressions, sheets=sheets,
         billing=billing, host=host, job_name=job_name,
-        media=media, sides=sides, raw_line=line_text,
+        media=media, sides=sides, color_mode=color_mode, raw_line=line_text,
     )
 
 # ─── DB migration helpers (called from db.init_db) ────────────────────────────
@@ -138,6 +152,8 @@ def ensure_jobs_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE jobs ADD COLUMN impressions INTEGER NOT NULL DEFAULT 0")
     if "sheets" not in current:
         conn.execute("ALTER TABLE jobs ADD COLUMN sheets INTEGER NOT NULL DEFAULT 0")
+    if "color_mode" not in current:
+        conn.execute("ALTER TABLE jobs ADD COLUMN color_mode TEXT NOT NULL DEFAULT ''")
 
 
 def backfill_impressions_and_sheets(conn: sqlite3.Connection) -> None:
@@ -192,16 +208,31 @@ def repair_historical_rows(conn: sqlite3.Connection) -> None:
             UPDATE jobs
             SET printer = ?, user_name = ?, job_id = ?, job_ts = ?, year_month = ?,
                 pages = ?, impressions = ?, sheets = ?,
-                billing = ?, host = ?, job_name = ?, media = ?, sides = ?
+                billing = ?, host = ?, job_name = ?, media = ?, sides = ?, color_mode = ?
             WHERE id = ?
             """,
             (
                 rec.printer, rec.user, rec.job_id,
                 rec.timestamp.isoformat(sep=" "), rec.timestamp.strftime("%Y-%m"),
                 rec.pages, rec.impressions, rec.sheets,
-                rec.billing, rec.host, rec.job_name, rec.media, rec.sides,
+                rec.billing, rec.host, rec.job_name, rec.media, rec.sides, rec.color_mode,
                 row["id"],
             ),
+        )
+
+
+def backfill_color_mode(conn: sqlite3.Connection) -> None:
+    """Re-parse raw_line for rows that have no color_mode yet."""
+    candidates = conn.execute(
+        "SELECT id, raw_line FROM jobs WHERE color_mode = '' OR color_mode IS NULL"
+    ).fetchall()
+    for row in candidates:
+        rec = parse_page_log_line(row["raw_line"])
+        if rec is None or not rec.color_mode:
+            continue
+        conn.execute(
+            "UPDATE jobs SET color_mode = ? WHERE id = ?",
+            (rec.color_mode, row["id"]),
         )
 
 # ─── Import SQL ────────────────────────────────────────────────────────────────
@@ -210,8 +241,8 @@ _INSERT_SQL = """
     INSERT INTO jobs (
         printer, user_name, job_id, job_ts, year_month,
         pages, impressions, sheets,
-        billing, host, job_name, media, sides, raw_line
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        billing, host, job_name, media, sides, color_mode, raw_line
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -220,7 +251,7 @@ def _rec_params(rec: JobRecord) -> tuple:
         rec.printer, rec.user, rec.job_id,
         rec.timestamp.isoformat(sep=" "), rec.timestamp.strftime("%Y-%m"),
         rec.pages, rec.impressions, rec.sheets,
-        rec.billing, rec.host, rec.job_name, rec.media, rec.sides, rec.raw_line,
+        rec.billing, rec.host, rec.job_name, rec.media, rec.sides, rec.color_mode, rec.raw_line,
     )
 
 # ─── Import state (inode + byte position) ─────────────────────────────────────

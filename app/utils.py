@@ -86,6 +86,23 @@ def ad_display(sam: str, ad_cfg: dict) -> str:
         )
     return h(sam)
 
+# ─── Color mode badge ──────────────────────────────────────────────────────────
+
+_BW_MODES = frozenset({
+    "monochrome", "process-monochrome", "auto-monochrome",
+    "bi-level", "process-bi-level", "highlight",
+})
+
+
+def color_mode_badge(mode: str) -> str:
+    """Return an HTML badge for a print-color-mode value."""
+    m = (mode or "").strip().lower()
+    if m == "color":
+        return '<span style="color:#0a7;font-weight:600;white-space:nowrap">&#9632; Color</span>'
+    if m in _BW_MODES:
+        return '<span style="color:#555;font-weight:600;white-space:nowrap">&#9633; B&amp;W</span>'
+    return '<span class="muted">-</span>'
+
 # ─── CSV response ──────────────────────────────────────────────────────────────
 
 def csv_response(filename: str, header: list[str], data_rows: Iterable[Iterable]) -> Response:

@@ -34,4 +34,5 @@ class JobRecord:
     job_name:   str
     media:      str
     sides:      str
+    color_mode: str
     raw_line:   str

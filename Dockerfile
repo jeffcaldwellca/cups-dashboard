@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
-LABEL org.opencontainers.image.title="CUPS Dashboard" \
-      org.opencontainers.image.description="Flask dashboard for CUPS print usage statistics" \
+LABEL org.opencontainers.image.title="PaperTrail for CUPS" \
+      org.opencontainers.image.description="Dashboard for CUPS print usage statistics" \
       org.opencontainers.image.source="https://github.com/jeffcaldwellca/cups-dashboard"
 
 WORKDIR /app
@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
 COPY dashboard.py .
+COPY app/ app/
 
 # ── Runtime defaults (all overridable via docker-compose or -e flags) ─────────
 ENV CUPS_PAGE_LOG=/var/log/cups/page_log \
@@ -25,8 +26,10 @@ VOLUME ["/data"]
 
 EXPOSE 5000
 
-# Drop to a non-root user for the running process
-RUN useradd -r -u 1001 -g root appuser
+# Drop to a non-root user for the running process.
+# Added to group lp (gid 7 on Debian/Ubuntu) so the process can read CUPS logs
+# that are owned root:lp with mode 640.
+RUN useradd -r -u 1001 -g root -G lp appuser 2>/dev/null || useradd -r -u 1001 -g root appuser
 USER appuser
 
 CMD ["python", "dashboard.py"]

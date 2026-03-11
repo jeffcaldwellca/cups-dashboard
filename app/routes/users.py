@@ -4,7 +4,7 @@ from ..ad import get_cached_ad_user
 from ..db import get_ad_config
 from ..importer import clean_token
 from ..renderer import render_page
-from ..utils import ad_display, csv_response, current_month_fallback, h, month_filter_form, rows
+from ..utils import ad_display, color_mode_badge, csv_response, current_month_fallback, h, month_filter_form, rows
 
 bp = Blueprint("users", __name__)
 
@@ -19,7 +19,9 @@ def users_page():
     summary_query = """
         SELECT user_name, COUNT(*) AS jobs, COALESCE(SUM(pages),0) AS pages,
                COALESCE(SUM(impressions),0) AS impressions,
-               COALESCE(SUM(sheets),0) AS sheets
+               COALESCE(SUM(sheets),0) AS sheets,
+               COALESCE(SUM(CASE WHEN color_mode = 'color' THEN impressions ELSE 0 END),0) AS color_impressions,
+               COALESCE(SUM(CASE WHEN color_mode IN ('monochrome','process-monochrome','auto-monochrome','bi-level','process-bi-level') THEN impressions ELSE 0 END),0) AS bw_impressions
         FROM jobs
         WHERE year_month = ?
     """
@@ -37,7 +39,7 @@ def users_page():
     if user:
         detail = rows(
             """
-            SELECT job_ts, printer, job_name, pages, impressions, sheets, media, sides
+            SELECT job_ts, printer, job_name, pages, impressions, sheets, media, sides, color_mode
             FROM jobs
             WHERE year_month = ? AND user_name = ?
             ORDER BY job_ts DESC
@@ -69,8 +71,9 @@ def users_page():
             dept_cell = f'<td>{h((info or {}).get("department") or "-")}</td>'
         return (f'<tr><td><a href="{url_for("users.users_page", month=month, user=r["user_name"])}">'
                 f'{ad_display(r["user_name"], ad_cfg)}</a></td>'
-                f'<td>{r["jobs"]}</td><td>{r["impressions"]}</td><td>{r["sheets"]}</td>'
-                f'<td>{r["pages"]}</td>{dept_cell}</tr>')
+                f'<td>{r["jobs"]}</td><td>{r["impressions"]}</td>'
+                f'<td>{r["color_impressions"]}</td><td>{r["bw_impressions"]}</td>'
+                f'<td>{r["sheets"]}</td><td>{r["pages"]}</td>{dept_cell}</tr>')
 
     body = month_filter_form(month) + ad_profile_html + f"""
     <div class="card">
@@ -79,7 +82,7 @@ def users_page():
       {'<div class="muted">Filtered by user: <span class="mono-chip">' + h(user) + '</span> &nbsp; <a href="' + url_for("users.users_page", month=month) + '">Clear</a></div>' if user else ''}
       <div class="table-wrap">
         <table>
-          <tr><th>User</th><th>Jobs</th><th>Impressions</th><th>Sheets</th><th>Pages</th>{dept_header}</tr>
+          <tr><th>User</th><th>Jobs</th><th>Impressions</th><th>&#9632; Color</th><th>&#9633; B&amp;W</th><th>Sheets</th><th>Pages</th>{dept_header}</tr>
           {''.join(_user_row(r) for r in summary)}
         </table>
       </div>
@@ -92,8 +95,8 @@ def users_page():
           <h2>Recent Jobs for {ad_display(user, ad_cfg)}</h2>
           <div class="table-wrap">
             <table>
-              <tr><th>Time</th><th>Printer</th><th>Job Name</th><th>Impressions</th><th>Sheets</th><th>Pages</th><th>Media</th><th>Sides</th></tr>
-              {''.join(f'<tr><td>{h(r["job_ts"])}</td><td>{h(r["printer"])}</td><td>{h(r["job_name"] or "-")}</td><td>{r["impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td><td>{h(r["media"] or "-")}</td><td>{h(r["sides"] or "-")}</td></tr>' for r in detail)}
+              <tr><th>Time</th><th>Printer</th><th>Job Name</th><th>Color</th><th>Impressions</th><th>Sheets</th><th>Pages</th><th>Media</th><th>Sides</th></tr>
+              {''.join(f'<tr><td>{h(r["job_ts"])}</td><td>{h(r["printer"])}</td><td>{h(r["job_name"] or "-")}</td><td>{color_mode_badge(r["color_mode"])}</td><td>{r["impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td><td>{h(r["media"] or "-")}</td><td>{h(r["sides"] or "-")}</td></tr>' for r in detail)}
             </table>
           </div>
         </div>
@@ -111,7 +114,9 @@ def export_users_csv():
         """
         SELECT user_name, COUNT(*) AS jobs, COALESCE(SUM(pages),0) AS pages,
                COALESCE(SUM(impressions),0) AS impressions,
-               COALESCE(SUM(sheets),0) AS sheets
+               COALESCE(SUM(sheets),0) AS sheets,
+               COALESCE(SUM(CASE WHEN color_mode = 'color' THEN impressions ELSE 0 END),0) AS color_impressions,
+               COALESCE(SUM(CASE WHEN color_mode IN ('monochrome','process-monochrome','auto-monochrome','bi-level','process-bi-level') THEN impressions ELSE 0 END),0) AS bw_impressions
         FROM jobs WHERE year_month = ?
         GROUP BY user_name
         ORDER BY impressions DESC, jobs DESC, user_name ASC
@@ -125,7 +130,8 @@ def export_users_csv():
         def _ad_row(r):
             info = get_cached_ad_user(r["user_name"], ttl) or {}
             return (
-                r["user_name"], r["jobs"], r["impressions"], r["sheets"], r["pages"],
+                r["user_name"], r["jobs"], r["impressions"], r["color_impressions"], r["bw_impressions"],
+                r["sheets"], r["pages"],
                 info.get("display_name") or "",
                 info.get("email") or "",
                 info.get("department") or "",
@@ -134,13 +140,13 @@ def export_users_csv():
 
         return csv_response(
             f"cups_users_{month}.csv",
-            ["user", "jobs", "impressions", "sheets", "pages",
+            ["user", "jobs", "impressions", "color_impressions", "bw_impressions", "sheets", "pages",
              "display_name", "email", "department", "title"],
             (_ad_row(r) for r in result),
         )
 
     return csv_response(
         f"cups_users_{month}.csv",
-        ["user", "jobs", "impressions", "sheets", "pages"],
-        ((r["user_name"], r["jobs"], r["impressions"], r["sheets"], r["pages"]) for r in result),
+        ["user", "jobs", "impressions", "color_impressions", "bw_impressions", "sheets", "pages"],
+        ((r["user_name"], r["jobs"], r["impressions"], r["color_impressions"], r["bw_impressions"], r["sheets"], r["pages"]) for r in result),
     )

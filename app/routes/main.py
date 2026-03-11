@@ -3,7 +3,7 @@ from flask import Blueprint, request, url_for
 from ..db import get_ad_config
 from ..importer import clean_token  # noqa: F401 (not used here but keep import consistent)
 from ..renderer import render_page
-from ..utils import ad_display, current_month_fallback, h, month_filter_form, rows, scalar
+from ..utils import ad_display, color_mode_badge, current_month_fallback, h, month_filter_form, rows, scalar
 
 bp = Blueprint("main", __name__)
 
@@ -19,12 +19,24 @@ def dashboard():
     total_jobs = scalar("SELECT COUNT(*) FROM jobs WHERE year_month = ?", (month,))
     unique_users = scalar("SELECT COUNT(DISTINCT user_name) FROM jobs WHERE year_month = ?", (month,))
     unique_printers = scalar("SELECT COUNT(DISTINCT printer) FROM jobs WHERE year_month = ?", (month,))
+    color_impressions = scalar(
+        "SELECT COALESCE(SUM(CASE WHEN color_mode = 'color' THEN impressions ELSE 0 END),0) FROM jobs WHERE year_month = ?",
+        (month,),
+    )
+    bw_impressions = scalar(
+        """SELECT COALESCE(SUM(CASE WHEN color_mode IN
+            ('monochrome','process-monochrome','auto-monochrome','bi-level','process-bi-level')
+            THEN impressions ELSE 0 END),0) FROM jobs WHERE year_month = ?""",
+        (month,),
+    )
 
     top_users = rows(
         """
         SELECT user_name, COUNT(*) AS jobs, COALESCE(SUM(pages),0) AS pages,
                COALESCE(SUM(impressions),0) AS impressions,
-               COALESCE(SUM(sheets),0) AS sheets
+               COALESCE(SUM(sheets),0) AS sheets,
+               COALESCE(SUM(CASE WHEN color_mode = 'color' THEN impressions ELSE 0 END),0) AS color_impressions,
+               COALESCE(SUM(CASE WHEN color_mode IN ('monochrome','process-monochrome','auto-monochrome','bi-level','process-bi-level') THEN impressions ELSE 0 END),0) AS bw_impressions
         FROM jobs WHERE year_month = ?
         GROUP BY user_name
         ORDER BY impressions DESC, jobs DESC, user_name ASC
@@ -36,7 +48,9 @@ def dashboard():
         """
         SELECT printer, COUNT(*) AS jobs, COALESCE(SUM(pages),0) AS pages,
                COALESCE(SUM(impressions),0) AS impressions,
-               COALESCE(SUM(sheets),0) AS sheets
+               COALESCE(SUM(sheets),0) AS sheets,
+               COALESCE(SUM(CASE WHEN color_mode = 'color' THEN impressions ELSE 0 END),0) AS color_impressions,
+               COALESCE(SUM(CASE WHEN color_mode IN ('monochrome','process-monochrome','auto-monochrome','bi-level','process-bi-level') THEN impressions ELSE 0 END),0) AS bw_impressions
         FROM jobs WHERE year_month = ?
         GROUP BY printer
         ORDER BY impressions DESC, jobs DESC, printer ASC
@@ -46,7 +60,7 @@ def dashboard():
     )
     recent = rows(
         """
-        SELECT printer, user_name, job_name, pages, impressions, sheets, job_ts
+        SELECT printer, user_name, job_name, pages, impressions, sheets, job_ts, color_mode
         FROM jobs
         ORDER BY job_ts DESC
         LIMIT 10
@@ -57,6 +71,8 @@ def dashboard():
     <div class="grid">
       <div class="card metric-card"><div class="muted">Month</div><div class="metric">{h(month)}</div></div>
       <div class="card metric-card"><div class="muted">Impressions</div><div class="metric">{total_impressions}</div></div>
+      <div class="card metric-card"><div class="muted">&#9632; Color</div><div class="metric" style="color:#0a7">{color_impressions}</div></div>
+      <div class="card metric-card"><div class="muted">&#9633; B&amp;W</div><div class="metric" style="color:#555">{bw_impressions}</div></div>
       <div class="card metric-card"><div class="muted">Sheets (Est.)</div><div class="metric">{total_sheets}</div></div>
       <div class="card metric-card"><div class="muted">Pages</div><div class="metric">{total_pages}</div></div>
       <div class="card metric-card"><div class="muted">Jobs</div><div class="metric">{total_jobs}</div></div>
@@ -69,8 +85,8 @@ def dashboard():
         <h2>Top Users <span class="pill">{h(month)}</span></h2>
         <div class="table-wrap">
           <table>
-            <tr><th>User</th><th>Jobs</th><th>Impressions</th><th>Sheets</th><th>Pages</th></tr>
-            {''.join(f'<tr><td><a href="{url_for("users.users_page", month=month, user=r["user_name"])}">{ad_display(r["user_name"], ad_cfg)}</a></td><td>{r["jobs"]}</td><td>{r["impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td></tr>' for r in top_users)}
+            <tr><th>User</th><th>Jobs</th><th>Impressions</th><th>&#9632; Color</th><th>&#9633; B&amp;W</th><th>Sheets</th><th>Pages</th></tr>
+            {''.join(f'<tr><td><a href="{url_for("users.users_page", month=month, user=r["user_name"])}">{ad_display(r["user_name"], ad_cfg)}</a></td><td>{r["jobs"]}</td><td>{r["impressions"]}</td><td>{r["color_impressions"]}</td><td>{r["bw_impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td></tr>' for r in top_users)}
           </table>
         </div>
       </div>
@@ -78,8 +94,8 @@ def dashboard():
         <h2>Top Printers <span class="pill">{h(month)}</span></h2>
         <div class="table-wrap">
           <table>
-            <tr><th>Printer</th><th>Jobs</th><th>Impressions</th><th>Sheets</th><th>Pages</th></tr>
-            {''.join(f'<tr><td><a href="{url_for("printers.printers_page", month=month, printer=r["printer"])}">{h(r["printer"])}</a></td><td>{r["jobs"]}</td><td>{r["impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td></tr>' for r in top_printers)}
+            <tr><th>Printer</th><th>Jobs</th><th>Impressions</th><th>&#9632; Color</th><th>&#9633; B&amp;W</th><th>Sheets</th><th>Pages</th></tr>
+            {''.join(f'<tr><td><a href="{url_for("printers.printers_page", month=month, printer=r["printer"])}">{h(r["printer"])}</a></td><td>{r["jobs"]}</td><td>{r["impressions"]}</td><td>{r["color_impressions"]}</td><td>{r["bw_impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td></tr>' for r in top_printers)}
           </table>
         </div>
       </div>
@@ -89,8 +105,8 @@ def dashboard():
       <h2>Recent Jobs</h2>
       <div class="table-wrap">
         <table>
-          <tr><th>Time</th><th>User</th><th>Printer</th><th>Job Name</th><th>Impressions</th><th>Sheets</th><th>Pages</th></tr>
-          {''.join(f'<tr><td>{h(r["job_ts"])}</td><td>{h(r["user_name"])}</td><td>{h(r["printer"])}</td><td>{h(r["job_name"] or "-")}</td><td>{r["impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td></tr>' for r in recent)}
+          <tr><th>Time</th><th>User</th><th>Printer</th><th>Job Name</th><th>Color</th><th>Impressions</th><th>Sheets</th><th>Pages</th></tr>
+          {''.join(f'<tr><td>{h(r["job_ts"])}</td><td>{h(r["user_name"])}</td><td>{h(r["printer"])}</td><td>{h(r["job_name"] or "-")}</td><td>{color_mode_badge(r["color_mode"])}</td><td>{r["impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td></tr>' for r in recent)}
         </table>
       </div>
     </div>

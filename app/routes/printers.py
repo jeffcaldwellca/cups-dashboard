@@ -3,7 +3,7 @@ from flask import Blueprint, request, url_for
 from ..db import get_ad_config
 from ..importer import clean_token
 from ..renderer import render_page
-from ..utils import ad_display, csv_response, current_month_fallback, h, month_filter_form, rows
+from ..utils import ad_display, color_mode_badge, csv_response, current_month_fallback, h, month_filter_form, rows
 
 bp = Blueprint("printers", __name__)
 
@@ -17,7 +17,9 @@ def printers_page():
     summary_query = """
         SELECT printer, COUNT(*) AS jobs, COALESCE(SUM(pages),0) AS pages,
                COALESCE(SUM(impressions),0) AS impressions,
-               COALESCE(SUM(sheets),0) AS sheets
+               COALESCE(SUM(sheets),0) AS sheets,
+               COALESCE(SUM(CASE WHEN color_mode = 'color' THEN impressions ELSE 0 END),0) AS color_impressions,
+               COALESCE(SUM(CASE WHEN color_mode IN ('monochrome','process-monochrome','auto-monochrome','bi-level','process-bi-level') THEN impressions ELSE 0 END),0) AS bw_impressions
         FROM jobs
         WHERE year_month = ?
     """
@@ -35,7 +37,7 @@ def printers_page():
     if printer:
         detail = rows(
             """
-            SELECT job_ts, user_name, job_name, pages, impressions, sheets, media, sides
+            SELECT job_ts, user_name, job_name, pages, impressions, sheets, media, sides, color_mode
             FROM jobs
             WHERE year_month = ? AND printer = ?
             ORDER BY job_ts DESC
@@ -51,8 +53,8 @@ def printers_page():
       {'<div class="muted">Filtered by printer: <span class="mono-chip">' + h(printer) + '</span> &nbsp; <a href="' + url_for("printers.printers_page", month=month) + '">Clear</a></div>' if printer else ''}
       <div class="table-wrap">
         <table>
-          <tr><th>Printer</th><th>Jobs</th><th>Impressions</th><th>Sheets</th><th>Pages</th></tr>
-          {''.join(f'<tr><td><a href="{url_for("printers.printers_page", month=month, printer=r["printer"])}">{h(r["printer"])}</a></td><td>{r["jobs"]}</td><td>{r["impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td></tr>' for r in summary)}
+          <tr><th>Printer</th><th>Jobs</th><th>Impressions</th><th>&#9632; Color</th><th>&#9633; B&amp;W</th><th>Sheets</th><th>Pages</th></tr>
+          {''.join(f'<tr><td><a href="{url_for("printers.printers_page", month=month, printer=r["printer"])}">{h(r["printer"])}</a></td><td>{r["jobs"]}</td><td>{r["impressions"]}</td><td>{r["color_impressions"]}</td><td>{r["bw_impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td></tr>' for r in summary)}
         </table>
       </div>
     </div>
@@ -64,8 +66,8 @@ def printers_page():
           <h2>Recent Jobs for {h(printer)}</h2>
           <div class="table-wrap">
             <table>
-              <tr><th>Time</th><th>User</th><th>Job Name</th><th>Impressions</th><th>Sheets</th><th>Pages</th><th>Media</th><th>Sides</th></tr>
-              {''.join(f'<tr><td>{h(r["job_ts"])}</td><td>{ad_display(r["user_name"], ad_cfg)}</td><td>{h(r["job_name"] or "-")}</td><td>{r["impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td><td>{h(r["media"] or "-")}</td><td>{h(r["sides"] or "-")}</td></tr>' for r in detail)}
+              <tr><th>Time</th><th>User</th><th>Job Name</th><th>Color</th><th>Impressions</th><th>Sheets</th><th>Pages</th><th>Media</th><th>Sides</th></tr>
+              {''.join(f'<tr><td>{h(r["job_ts"])}</td><td>{ad_display(r["user_name"], ad_cfg)}</td><td>{h(r["job_name"] or "-")}</td><td>{color_mode_badge(r["color_mode"])}</td><td>{r["impressions"]}</td><td>{r["sheets"]}</td><td>{r["pages"]}</td><td>{h(r["media"] or "-")}</td><td>{h(r["sides"] or "-")}</td></tr>' for r in detail)}
             </table>
           </div>
         </div>
@@ -81,7 +83,9 @@ def export_printers_csv():
         """
         SELECT printer, COUNT(*) AS jobs, COALESCE(SUM(pages),0) AS pages,
                COALESCE(SUM(impressions),0) AS impressions,
-               COALESCE(SUM(sheets),0) AS sheets
+               COALESCE(SUM(sheets),0) AS sheets,
+               COALESCE(SUM(CASE WHEN color_mode = 'color' THEN impressions ELSE 0 END),0) AS color_impressions,
+               COALESCE(SUM(CASE WHEN color_mode IN ('monochrome','process-monochrome','auto-monochrome','bi-level','process-bi-level') THEN impressions ELSE 0 END),0) AS bw_impressions
         FROM jobs WHERE year_month = ?
         GROUP BY printer
         ORDER BY impressions DESC, jobs DESC, printer ASC
@@ -90,6 +94,6 @@ def export_printers_csv():
     )
     return csv_response(
         f"cups_printers_{month}.csv",
-        ["printer", "jobs", "impressions", "sheets", "pages"],
-        ((r["printer"], r["jobs"], r["impressions"], r["sheets"], r["pages"]) for r in result),
+        ["printer", "jobs", "impressions", "color_impressions", "bw_impressions", "sheets", "pages"],
+        ((r["printer"], r["jobs"], r["impressions"], r["color_impressions"], r["bw_impressions"], r["sheets"], r["pages"]) for r in result),
     )
